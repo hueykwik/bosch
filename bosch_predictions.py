@@ -79,3 +79,5 @@ submission = pd.read_csv('sample_submission.csv')
 submission.Response = y_pred
 
 print(time.time() - start)
+
+submission.to_csv('first_submission.csv', index=False)
