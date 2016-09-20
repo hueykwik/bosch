@@ -18,7 +18,7 @@ def notnull_colsbyrow(df, index):
 
 
 dates = pd.read_csv('train_date.csv',
-                    nrows = 10000, 
+                    nrows = 20000, 
                     index_col = 0, 
                     dtype = pd.np.float64,)
                     
@@ -27,10 +27,10 @@ numeric = pd.read_csv('train_numeric.csv',
                     index_col = 0, 
                     dtype = pd.np.float64,)
                     
-test =  pd.read_csv('test_date.csv',
-                    nrows = 10000, 
-                    index_col = 0, 
-                    dtype = pd.np.float64,)
+#test =  pd.read_csv('test_date.csv',
+#                    nrows = 10000, 
+#                    index_col = 0, 
+#                    dtype = pd.np.float64,)
 
 #==============================================================================
 # categories = pd.read_csv('train_categorical.csv',
@@ -141,6 +141,8 @@ numeric['throughlate'] = numeric.notnull().multiply(tomult).sum(axis = 1)
 
 ##### Check if test and train have similar date profiles
 ####### read in only parts of a file to grab the failures only
+
+print('start loading iterators')
 iter_csv = pd.read_csv('train_numeric.csv', 
                            iterator = True, 
                            chunksize = 1000,
@@ -149,10 +151,12 @@ iter_csv = pd.read_csv('train_numeric.csv',
 failures = pd.concat([chunk[chunk['Response'] == 1] for chunk in iter_csv])
 indexfail = failures.index
 
+print('second loading iterators')
 #read in datefile and grab only the failure times
 date_iter_csv = pd.read_csv('train_date.csv',
                             iterator = True,
-                            chunksize = 1000)
+                            chunksize = 1000,
+                            index_col = 0)
                         
 faildatedf = pd.concat([chunk[chunk.index.isin(indexfail)] 
                         for chunk in date_iter_csv])
@@ -170,8 +174,72 @@ for col in list(faildatedf):
     current = faildatedf[col].copy()
     current.dropna(inplace = True)
     fail_profile = fail_profile.append(current)
-fail_profile.drop_duplicates(inplace = True)
-fail_profile.plot(kind = 'hist')
+
+fpconcise = fail_profile.drop_duplicates()
+
+first_fails = []
+numfails = 0
+for i in faildatedf.iterrows():    
+    try:
+        first_fails.append(i[1].dropna().min())
+    except:
+        numfails+= 1
+
+first_fails = pd.Series(first_fails)
+
+last_fails = []
+numfails = 0
+for i in faildatedf.iterrows():    
+    try:
+        last_fails.append(i[1].dropna().max())
+    except:
+        numfails+= 1
+
+last_fails = pd.Series(last_fails)
+
+pd.cut(first_fails, 1000, retbins = True, labels = False)[0].value_counts().sort_index().plot()
 
 
+# for each row in failures, see how many failures occurred between its
+# start and end date
 
+failsduring = []
+for j in faildatedf.iterrows():
+    first = j[1].dropna().min()
+    last = j[1].dropna().max()
+    count = (first_fails > first).multiply((first_fails < last)).sum()
+#    faildatedf.loc[j[0]]['failsduring'] = count
+    failsduring.append(count)
+    
+failsduring = pd.Series(failsduring,index = faildatedf.index)
+faildatedf['failsduring'] = failsduring
+
+
+failsduring = []
+for j in dates.iterrows():
+    first = j[1].dropna().min()
+    last = j[1].dropna().max()
+    count = (first_fails > first).multiply((first_fails < last)).sum()
+#    faildatedf.loc[j[0]]['failsduring'] = count
+    failsduring.append(count)
+    
+failsduring = pd.Series(failsduring,index = dates.index)
+dates['failsduring'] = failsduring
+
+
+# this grabs pieces of the overall dataframe and operates on them
+failsduring = []
+date_iter_csv = pd.read_csv('train_date.csv',
+                            iterator = True,
+                            chunksize = 1000,
+                            index_col = 0)
+
+for chunk in date_iter_csv:
+    for j in chunk.iterrows():
+        first = j[1].dropna().min()
+        last = j[1].dropna().max()
+        count = (first_fails > first).multiply((first_fails < last)).sum()
+    #    faildatedf.loc[j[0]]['failsduring'] = count
+        failsduring.append(count)
+                        
+failsduring = pd.Series(failsduring)
