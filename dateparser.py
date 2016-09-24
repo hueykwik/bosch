@@ -39,52 +39,55 @@ numeric = pd.read_csv('train_numeric.csv',
 #                          low_memory = False)
 #==============================================================================
 
-counter = 0
-line_station_dict = {}
-for col in dates:
-    #add all column names to set that correspond to line and station
-#    print(col.split('_'))
-    lsname = col.split('_')
-    lsid = lsname[1] #lsname[0] + '_' + 
-
-    if lsid in line_station_dict.keys():
-        line_station_dict[lsid].append(col)
-    else:
-        line_station_dict[lsid] = [col]
-    
-#    if counter > 5:
-#        break
-    counter += 1
-
-# collect all series for stations into one Series, remove duplicates, store
-stationtimes = {}    
-progress = 0
-length = len(line_station_dict.keys())
-for key in line_station_dict.keys():
-    alltimes = pd.Series()
-    for colname in line_station_dict[key]:
-        alltimes = alltimes.append(dates[colname])
-        alltimes.dropna(inplace = True)
-        alltimes.drop_duplicates(inplace = True)
-    
-    stationtimes[key] = alltimes.sort_values().diff().iloc[1:]
-    print('progress:',progress/length)
-    progress += 1
-
-
-avgtimes = {}
-stdtimes = {}
-hasoutliers = {}
-for i in stationtimes.keys():
-    avgtimes[i] = stationtimes[i].mean()
-    stdtimes[i] = stationtimes[i].std()
-    
-    condition = avgtimes[i] + stdtimes[i]
-    number = len(stationtimes[i])
-    if ((stationtimes[i] - condition) > 0).sum() > 3: #(number/30):
-        hasoutliers[i] = True
-    else: 
-        hasoutliers[i] = False
+#==============================================================================
+### load information on stations
+# counter = 0
+# line_station_dict = {}
+# for col in dates:
+#     #add all column names to set that correspond to line and station
+# #    print(col.split('_'))
+#     lsname = col.split('_')
+#     lsid = lsname[1] #lsname[0] + '_' + 
+# 
+#     if lsid in line_station_dict.keys():
+#         line_station_dict[lsid].append(col)
+#     else:
+#         line_station_dict[lsid] = [col]
+#     
+# #    if counter > 5:
+# #        break
+#     counter += 1
+# 
+# # collect all series for stations into one Series, remove duplicates, store
+# stationtimes = {}    
+# progress = 0
+# length = len(line_station_dict.keys())
+# for key in line_station_dict.keys():
+#     alltimes = pd.Series()
+#     for colname in line_station_dict[key]:
+#         alltimes = alltimes.append(dates[colname])
+#         alltimes.dropna(inplace = True)
+#         alltimes.drop_duplicates(inplace = True)
+#     
+#     stationtimes[key] = alltimes.sort_values().diff().iloc[1:]
+#     print('progress:',progress/length)
+#     progress += 1
+# 
+# 
+# avgtimes = {}
+# stdtimes = {}
+# hasoutliers = {}
+# for i in stationtimes.keys():
+#     avgtimes[i] = stationtimes[i].mean()
+#     stdtimes[i] = stationtimes[i].std()
+#     
+#     condition = avgtimes[i] + stdtimes[i]
+#     number = len(stationtimes[i])
+#     if ((stationtimes[i] - condition) > 0).sum() > 3: #(number/30):
+#         hasoutliers[i] = True
+#     else: 
+#         hasoutliers[i] = False
+#==============================================================================
 
 #==============================================================================
 # timebin = pd.Series()    
@@ -93,7 +96,7 @@ for i in stationtimes.keys():
 #         timebin = timebin.append(stationtimes[i])
 #==============================================================================
 
-hasoutliers = pd.Series(hasoutliers)
+#hasoutliers = pd.Series(hasoutliers)
 
 #shouldn't be needed
 #==============================================================================
@@ -112,17 +115,20 @@ hasoutliers = pd.Series(hasoutliers)
 #         print('stupid one row at a time',prog_counter / numrows)
 #==============================================================================
 
-stations = numeric.columns
-onerow = {}
-for j in range(len(stations)):
-    string = stations[j][3:6].strip('_')
-    if string in hasoutliers[hasoutliers == True].index:
-        onerow[stations[j]] = 1
-    else:
-        onerow[stations[j]] = 0
-    
-tomult = pd.DataFrame(onerow,index = numeric.index)
-numeric['throughlate'] = numeric.notnull().multiply(tomult).sum(axis = 1)
+#==============================================================================
+### load information on stations
+# stations = numeric.columns
+# onerow = {}
+# for j in range(len(stations)):
+#     string = stations[j][3:6].strip('_')
+#     if string in hasoutliers[hasoutliers == True].index:
+#         onerow[stations[j]] = 1
+#     else:
+#         onerow[stations[j]] = 0
+#     
+# tomult = pd.DataFrame(onerow,index = numeric.index)
+# numeric['throughlate'] = numeric.notnull().multiply(tomult).sum(axis = 1)
+#==============================================================================
 
 #timebin.plot(kind = 'hist')
 #manhist = timebin.value_counts()
@@ -148,6 +154,7 @@ iter_csv = pd.read_csv('train_numeric.csv',
                            chunksize = 1000,
                            index_col = 0)
 
+#find failing responses
 failures = pd.concat([chunk[chunk['Response'] == 1] for chunk in iter_csv])
 indexfail = failures.index
 
@@ -158,25 +165,29 @@ date_iter_csv = pd.read_csv('train_date.csv',
                             chunksize = 1000,
                             index_col = 0)
                         
+#check failing responses against dates to build a profile
 faildatedf = pd.concat([chunk[chunk.index.isin(indexfail)] 
                         for chunk in date_iter_csv])
 
-train_profile = pd.Series()
-for col in list(dates):
-    current = dates[col].copy()
-    current.dropna(inplace = True)
-    train_profile = train_profile.append(current)
-train_profile.drop_duplicates(inplace = True)
-train_profile.plot(kind = 'hist')
-
-fail_profile = pd.Series()
-for col in list(faildatedf):
-    current = faildatedf[col].copy()
-    current.dropna(inplace = True)
-    fail_profile = fail_profile.append(current)
-
-fpconcise = fail_profile.drop_duplicates()
-
+#==============================================================================
+# ### plot
+# train_profile = pd.Series()
+# for col in list(dates):
+#     current = dates[col].copy()
+#     current.dropna(inplace = True)
+#     train_profile = train_profile.append(current)
+# train_profile.drop_duplicates(inplace = True)
+# train_profile.plot(kind = 'hist')
+# 
+# fail_profile = pd.Series()
+# for col in list(faildatedf):
+#     current = faildatedf[col].copy()
+#     current.dropna(inplace = True)
+#     fail_profile = fail_profile.append(current)
+# 
+# fpconcise = fail_profile.drop_duplicates()
+# 
+#==============================================================================
 first_fails = []
 numfails = 0
 for i in faildatedf.iterrows():    
@@ -197,7 +208,7 @@ for i in faildatedf.iterrows():
 
 last_fails = pd.Series(last_fails)
 
-pd.cut(first_fails, 1000, retbins = True, labels = False)[0].value_counts().sort_index().plot()
+#pd.cut(first_fails, 1000, retbins = True, labels = False)[0].value_counts().sort_index().plot()
 
 
 # for each row in failures, see how many failures occurred between its
