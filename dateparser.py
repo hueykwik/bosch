@@ -239,18 +239,23 @@ dates['failsduring'] = failsduring
 
 
 # this grabs pieces of the overall dataframe and operates on them
-failsduring = []
+
 date_iter_csv = pd.read_csv('train_date.csv',
                             iterator = True,
                             chunksize = 1000,
                             index_col = 0)
 
+fails_during = pd.Series()
+
 for chunk in date_iter_csv:
+    current_score = pd.Series(index = chunk.index)
     for j in chunk.iterrows():
         first = j[1].dropna().min()
         last = j[1].dropna().max()
         count = (first_fails > first).multiply((first_fails < last)).sum()
     #    faildatedf.loc[j[0]]['failsduring'] = count
-        failsduring.append(count)
-                        
-failsduring = pd.Series(failsduring)
+        current_score[j[0]] = count
+    
+    fails_during = fails_during.append(current_score)
+    
+fails_during.to_csv('fail_date_score.csv')
